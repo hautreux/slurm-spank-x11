@@ -433,8 +433,11 @@ exit:
 int slurm_spank_user_init (spank_t sp, int ac, char **av)
 {
 	int status=-1;
+	int do_init=0;
 	uint32_t jobid;
 	uint32_t stepid;
+	uint32_t nnodes;
+	uint32_t nodeid; 
 
 	if ( x11_mode == X11_MODE_NONE )
 		return 0;
@@ -451,7 +454,39 @@ int slurm_spank_user_init (spank_t sp, int ac, char **av)
 		return _x11_init_remote_batch(sp,jobid,stepid);
 	}
 	else if ( x11_mode != X11_MODE_BATCH ) {
-		return _x11_init_remote_inter(sp,jobid,stepid);
+
+		/* get the number of nodes */
+		if ( spank_get_item (sp, S_JOB_NNODES, &nnodes) != ESPANK_SUCCESS )
+			return status;
+		
+		/* get the local node ID */
+		if ( spank_get_item (sp, S_JOB_NODEID, &nodeid) != ESPANK_SUCCESS )
+			return status;
+
+		/* test if the local node has to go further */
+		switch ( x11_mode ) {
+		case X11_MODE_FIRST :
+			if ( nodeid == 0 ) {
+				do_init = 1;
+			}
+			break;
+		case X11_MODE_LAST :
+			if ( nodeid == (nnodes - 1) ) {
+				do_init = 1;
+			}
+			break;
+		case X11_MODE_ALL :
+			do_init = 1;
+			break;
+		default :
+			break;
+		}
+		
+		/* do the initialization of the X11 export if requested */
+		if ( do_init == 1 )
+			return _x11_init_remote_inter(sp,jobid,stepid);
+		else
+			return 0;
 	}
 
 }
