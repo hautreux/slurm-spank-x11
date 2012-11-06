@@ -85,9 +85,79 @@ static char* helpertask_args = NULL ;
 SPANK_PLUGIN(x11, 1);
 
 /*
+ * Implement a local version of popen that ensure that the command is 
+ * ran with real and saved set-user-id uid/git set to effective uid/gid
+ */
+static FILE *xpopen(const char *command, const char *mode)
+{
+	int pid;
+	int pep[2];          /* pipe endpoints */
+	int p_end, c_end;    /* identify parent and child endpoints */
+
+	uid_t euid;
+	gid_t egid;
+
+	/* identify process to pipe endpoints based on requested mode (r|w) */
+	if ( *mode == 'r' ) {
+		p_end = 0;
+		c_end = 1 ;
+	} else if ( *mode == 'w' ) {
+		p_end = 1;
+		c_end = 0 ;
+	} else
+		return NULL ;
+	
+	/* create the pipe */
+	if ( pipe(pep) < 0 )
+		return NULL;
+
+	/* create a child task to run the command and get the 
+	 * associated FILE* in the parent process */
+	switch( pid = fork() )
+	{
+
+	case -1: 
+		ERROR("xopen: unable to fork child task");
+		return NULL;
+	case 0:
+		/* child process closes the parent endpoint 
+		 * and redirect the pipe to either the stdin or 
+		 * stdout fd (0|1) */
+		if (close(pep[p_end]) == -1)
+			exit(1);
+		if (dup2(pep[c_end],c_end) == -1)
+			exit(1);
+		if (close(pep[c_end]) == -1)
+			exit(1);
+		
+		/* change real/saved_set-user-id uid and gid to match the effective one
+		 * without that the execl of /bin/sh would automatically revert to
+		 * an execution using the real uid/gid. That is a security issue that we
+		 * have to avoid.
+		 */
+		euid = geteuid();
+		egid = getegid();
+		if (setresgid(egid,-1,egid) || setresuid(euid,-1,euid))
+			exit(2);
+	      
+		/* execute the  provided command */
+		execl( "/bin/sh", "sh", "-c", command, NULL );
+		exit(1);
+
+	default:
+		/* parent process closes the child endpoint and return 
+		 * the file descriptor to use in either r or w mode */
+		if ( close(pep[c_end]) == -1 )
+			return NULL;
+		return fdopen(pep[p_end], mode);
+	}
+} 
+
+/*
  *  Provide a --x11=first|last|all option to srun:
  */
 static int _x11_opt_process (int val, const char *optarg, int remote);
+
 
 struct spank_option spank_opts[] =
 {
@@ -319,7 +389,7 @@ int _x11_init_remote_batch(spank_t sp,uint32_t jobid,uint32_t stepid)
 	else {
 		INFO("x11: batch mode : executing %s",cmd);
 	        /* execute the command to retrieve the DISPLAY value to use */
-		f = popen(cmd,"r");
+		f = xpopen(cmd,"r");
 		if ( f != NULL ) {
 			if ( fscanf(f,"%255s",display) == 1 ) {
 				if ( spank_setenv(sp,"DISPLAY",display,1)
@@ -421,7 +491,7 @@ int slurm_spank_exit (spank_t sp, int ac, char **av)
 		ERROR("x11: error while creating remove reference cmd");
 	}
 	else {
-		f = popen(expc_cmd,"r");
+		f = xpopen(expc_cmd,"r");
 		if ( f == NULL ) {
 			ERROR("x11: unable to exec remove"
 				    " cmd '%s'",expc_cmd);
