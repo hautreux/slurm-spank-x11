@@ -1,6 +1,6 @@
 Summary: Slurm spank plugin for X11 display support
 Name: slurm-spank-x11
-Version: 0.2.4
+Version: 0.2.5
 Release: 1
 License: GPL
 Group: System Environment/Base
@@ -48,6 +48,9 @@ rm -rf $RPM_BUILD_ROOT
 %config %{_sysconfdir}/slurm/plugstack.conf.d/x11.conf.example
 
 %changelog
+* Tue Nov 06 2012 HAUTREUX Matthieu <matthieu.hautreux@cea.fr> -  0.2.5-1
+- Correct a bug in --x11=first|last management, ensuring that only the
+  targeted nodes performed X11 related actions
 * Tue Nov 06 2012 HAUTREUX Matthieu <matthieu.hautreux@cea.fr> -  0.2.4-1
 - Move to the usage of xpopen instead of standard popen function
   (security fix)
