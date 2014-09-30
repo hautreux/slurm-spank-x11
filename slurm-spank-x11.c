@@ -183,7 +183,7 @@ int main(int argc,char** argv)
 	char* optstring = "hi:crgwf:t:pd:u:s:o:";
 	char* short_options_desc = "Usage : %s [-h] -i refid [-g|c|r] [-w] \n\[-u user] [-t nodeB"
 		" [-f nodeA [-d display]] [-s ssh_cmd] [-o ssh_args] ] \n";
-	char  option;
+	int   option;
 	char* addon_options_desc="\n\
         -h\t\tshow this message\n\
         -i refid\tjob id to use as a reference\n\
