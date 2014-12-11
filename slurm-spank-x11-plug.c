@@ -204,7 +204,7 @@ int slurm_spank_local_user_init (spank_t sp, int ac, char **av)
 
 	/* check DISPLAY value */
 	if ( getenv("DISPLAY") == NULL ) {
-		ERROR("x11: no local DISPLAY defined, skipping",jobid);
+		ERROR("x11: no local DISPLAY defined, skipping");
 		return 0;
 	}
 
